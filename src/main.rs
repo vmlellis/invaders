@@ -1,15 +1,16 @@
-use std::error::Error;
-use std::sync::mpsc;
-use std::{io, thread};
-use std::time::{Duration, Instant};
 use crossterm::cursor::{Hide, Show};
 use crossterm::event::{Event, KeyCode};
-use crossterm::{ExecutableCommand, event, terminal};
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::{ExecutableCommand, event, terminal};
 use invaders::frame::{Drawable, new_frame};
+use invaders::invaders::Invaders;
 use invaders::player::Player;
 use invaders::{frame, render};
 use rusty_audio::Audio;
+use std::error::Error;
+use std::sync::mpsc;
+use std::time::{Duration, Instant};
+use std::{io, thread};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let dir_path = "audio/contributions/gekh/";
@@ -35,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut stdout = io::stdout();
         render::render(&mut stdout, &last_frame, &last_frame, true);
         loop {
-            let curr_frame =match render_rx.recv() {
+            let curr_frame = match render_rx.recv() {
                 Ok(x) => x,
                 Err(_) => break,
             };
@@ -47,6 +48,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Game Loop
     let mut player = Player::new();
     let mut instant = Instant::now();
+    let mut invaders = Invaders::new();
     'gameloop: loop {
         // Per-frame init
         let delta = instant.elapsed();
@@ -75,9 +77,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         // Updates
         player.update(delta);
+        if invaders.update(delta) {
+            audio.play("move");
+        }
 
         // Draw & render
-        player.draw(&mut curr_frame);
+        let drawables: Vec<&dyn Drawable> = vec![&player, &invaders];
+        for drawable in drawables {
+            drawable.draw(&mut curr_frame);
+        }
         let _ = render_tx.send(curr_frame);
         thread::sleep(Duration::from_millis(1));
     }
